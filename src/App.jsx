@@ -1061,8 +1061,13 @@ function App() {
   const totalRevenue = useMemo(() => activeTransactions.reduce((acc, t) => acc + parseFloat(t.total || 0), 0), [activeTransactions]);
   const totalProfit = useMemo(() => activeTransactions.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0), [activeTransactions]);
   const todaysTransactions = useMemo(() => {
-    const today = new Date().toLocaleDateString();
-    return activeTransactions.filter(t => t.date && t.date.includes(today));
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+    return activeTransactions.filter(t => {
+      const ts = t.timestamp || new Date(t.date).getTime();
+      return ts >= startOfDay && ts < endOfDay;
+    });
   }, [activeTransactions]);
   const todaysSales = useMemo(() => todaysTransactions.reduce((acc, t) => acc + parseFloat(t.total || 0), 0), [todaysTransactions]);
   const todaysProfit = useMemo(() => todaysTransactions.reduce((acc, t) => acc + parseFloat(t.profit || 0), 0), [todaysTransactions]);
@@ -1284,7 +1289,7 @@ function App() {
         subtotal: parseFloat(subtotal.toFixed(2)),
         tax: parseFloat(tax.toFixed(2)),
         total: parseFloat(total.toFixed(2)),
-        profit: parseFloat(isSeniorSale ? (total - cart.reduce((acc, i) => acc + (i.costPrice * i.quantity), 0)) : trxProfit.toFixed(2)), // Simplistic for now, can refine
+        profit: parseFloat((total - cart.reduce((acc, i) => acc + (parseFloat(i.costPrice) || 0) * i.quantity, 0)).toFixed(2)), // Simplistic for now, can refine
         discount: parseFloat(cartMetrics.discount.toFixed(2)),
         isSeniorSale,
         seniorInfo,

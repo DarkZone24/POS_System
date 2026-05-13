@@ -2106,7 +2106,7 @@ function App() {
         <aside className="cart-panel" style={{ borderRadius: 0, borderTop: 0, borderRight: 0, borderBottom: 0 }}>
           <div className="cart-header">
             <h3>Bill Details</h3>
-            <span className="badge warning" style={{ padding: '0.4rem 0.8rem' }}>{cart.length} ITEMS</span>
+            <span className="badge warning" style={{ padding: '0.4rem 0.8rem' }}>ITEMS</span>
           </div>
           {storeProfile.enableCRM && (
             <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)' }}>
@@ -2148,12 +2148,7 @@ function App() {
                 )}
                 <div className="cart-item-info">
                   <h4 style={{ fontSize: '0.9rem' }}>{item.name}</h4>
-                  <p style={{ color: 'var(--accent)', fontWeight: 600 }}>₱{parseFloat(item.price || 0).toFixed(2)} x {item.quantity}</p>
-                </div>
-                <div className="quantity-controls">
-                  <button onClick={() => updateQuantity(item.id, -1)}>-</button>
-                  <span style={{ minWidth: '1.5rem', textAlign: 'center' }}>{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.id, 1)}>+</button>
+                  <p style={{ color: 'var(--accent)', fontWeight: 600 }}>₱{parseFloat(item.price || 0).toFixed(2)} x {item.quantity} </p>
                 </div>
                 <button type="button" className="action-btn danger" onClick={() => voidCartItem(item.id)} style={{ padding: '0.35rem 0.55rem', fontSize: '0.75rem' }}>Void</button>
               </div>

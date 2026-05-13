@@ -129,7 +129,10 @@ function App() {
   const [transactions, setTransactions] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [timeLogs, setTimeLogs] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('pos_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [users, setUsers] = useState([
     { username: 'admin', password: 'Admin@12345', role: 'admin', mustChangePassword: true, email: '' }
   ]);
@@ -356,6 +359,8 @@ function App() {
 
   // --- Cloud Synchronization (Supabase) ---
   useEffect(() => {
+    let activeChannel = null;
+
     const initializeAppData = async () => {
       try {
         // 1. Fetch all data from Cloud (Supabase)
@@ -434,8 +439,6 @@ function App() {
           if (dbProfile) {
             setStoreProfile(dbProfile);
             setFavorites(dbProfile.favorites || []);
-            // BIR settings are usually per machine but can be global
-            // We'll keep them as part of the local machine for now or merge
           }
           if (dbCustomers) setCustomers(dbCustomers);
           if (dbTimeLogs) setTimeLogs(dbTimeLogs);
@@ -443,33 +446,29 @@ function App() {
 
         // 3. Real-time Subscriptions - STABLE PATTERN
         try {
-          const oldChannel = supabase.getChannels().find(c => c.name === 'pos_updates');
-          if (oldChannel) supabase.removeChannel(oldChannel);
+          const oldChannels = supabase.getChannels().filter(c => c.name === 'pos_updates');
+          oldChannels.forEach(c => supabase.removeChannel(c));
         } catch (e) { }
 
-        const channel = supabase.channel('pos_updates');
-
-        channel.on('postgres_changes', { event: '*', table: 'products' }, async () => {
-          const { data } = await supabase.from('products').select('*');
-          if (data) setProducts(data.map(p => ({
-            ...p, costPrice: p.cost_price, isVatExempt: p.is_vat_exempt
-          })));
-        });
-
-        channel.on('postgres_changes', { event: '*', table: 'transactions' }, async () => {
-          const { data } = await supabase.from('transactions').select('*').order('date', { ascending: false });
-          if (data) setTransactions(data.map(t => ({
-            ...t, vatableSales: t.vatable_sales, vatExemptSales: t.vat_exempt_sales, paymentMethod: t.payment_method, seniorInfo: t.senior_info
-          })));
-        });
-
-        channel.subscribe();
+        activeChannel = supabase.channel('pos_updates')
+          .on('postgres_changes', { event: '*', table: 'products' }, async () => {
+            const { data } = await supabase.from('products').select('*');
+            if (data) setProducts(data.map(p => ({
+              ...p, costPrice: p.cost_price, isVatExempt: p.is_vat_exempt
+            })));
+          })
+          .on('postgres_changes', { event: '*', table: 'transactions' }, async () => {
+            const { data } = await supabase.from('transactions').select('*').order('date', { ascending: false });
+            if (data) setTransactions(data.map(t => ({
+              ...t, vatableSales: t.vatable_sales, vatExemptSales: t.vat_exempt_sales, paymentMethod: t.payment_method, seniorInfo: t.senior_info
+            })));
+          })
+          .subscribe();
 
         const sessionUser = JSON.parse(localStorage.getItem('pos_current_user') || 'null');
         if (sessionUser) {
           const latestUser = (dbUsers || []).find(u => u.username === sessionUser.username);
-          // Safety Enforcer: If using default password, ALWAYS force reset
-          if (latestUser && (latestUser.must_change_password || latestUser.password === 'Admin@12345')) {
+          if (latestUser && (latestUser.must_change_password || latestUser.password === 'Admin@12345' || latestUser.password === 'password123')) {
             const mappedUser = { ...latestUser, mustChangePassword: true, swipeId: latestUser.swipe_id };
             setCurrentUser(mappedUser);
             setForceChangeUser(mappedUser);
@@ -480,19 +479,23 @@ function App() {
           }
           setCurrentView('pos');
         }
-
-        return () => supabase.removeChannel(channels);
       } catch (err) {
         console.error('Cloud Sync Failure:', err);
         showToast('Offline mode or connection failed.', 'warning');
-        // Fallback to local
         const localProds = await db.get('products');
         if (localProds) setProducts(localProds);
       } finally {
         setIsInitializing(false);
       }
     };
+
     initializeAppData();
+
+    return () => {
+      if (activeChannel) {
+        supabase.removeChannel(activeChannel);
+      }
+    };
   }, []);
 
   // --- Persistence (Dual Write: Cloud + Local Fallback) ---
@@ -660,6 +663,7 @@ function App() {
       setIsProcessingLogin(true);
       setTimeout(async () => {
         setCurrentUser(userMatch);
+        localStorage.setItem('pos_current_user', JSON.stringify(userMatch));
         setLoginForm({ email: '', password: '' });
         setIsProcessingLogin(false);
         setCurrentView('pos');
@@ -719,6 +723,7 @@ function App() {
       const updatedUser = { ...currentUser, username: newUsername, password: newPassword };
       setUsers(prev => prev.map(u => u.username === currentUser.username ? updatedUser : u));
       setCurrentUser(updatedUser);
+      localStorage.setItem('pos_current_user', JSON.stringify(updatedUser));
       if (currentUser.role === 'admin') {
         setBirSettings({ enabled: settingsForm.birEnabled, tin: settingsForm.tin, ptu: settingsForm.ptu, min: settingsForm.min });
         setStoreProfile({
@@ -771,6 +776,7 @@ function App() {
       }
     }
     setCurrentUser(null);
+    localStorage.removeItem('pos_current_user');
     setCurrentView('dashboard');
     showToast('Logged out successfully.', 'info');
   };
@@ -908,6 +914,7 @@ function App() {
     setIsProcessingLogin(true);
     setTimeout(() => {
       setCurrentUser(updatedUser);
+      localStorage.setItem('pos_current_user', JSON.stringify(updatedUser));
       setIsProcessingLogin(false);
       setCurrentView(updatedUser.role === 'cashier' ? 'pos' : 'dashboard');
     }, 1000);
@@ -2034,25 +2041,31 @@ function App() {
                 const isOutOfStock = !isUnlimited && p.stock <= 0;
                 const isLowStock = !isUnlimited && !isOutOfStock && p.stock <= (p.minStock || 5);
                 return (
-                  <div key={p.id} className={`product-card ${isOutOfStock ? 'disabled' : ''}`} onClick={() => { if (isOutOfStock) return; addToCart(p, false, purchaseQuantity); setPurchaseQuantity(1); showToast(`✓ ${p.name} added to cart`, 'success'); }} style={{ height: '100%', opacity: isOutOfStock ? 0.6 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer', position: 'relative' }}>
-                    <div style={{ position: 'relative' }}>
-                      <img src={p.image} className="product-image" alt="" style={{ height: '150px', objectFit: 'cover' }} />
-                      {!isUnlimited && (
-                        <div style={{ position: 'absolute', top: '8px', right: '8px', background: isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : 'rgba(16,185,129,0.9)', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, zIndex: 10 }}>
-                          {isOutOfStock ? 'OUT OF STOCK' : `${p.stock} LEFT`}
-                        </div>
-                      )}
-                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id, e); }} style={{ position: 'absolute', top: '8px', left: '8px', background: favorites.includes(p.id) ? 'rgba(245,158,11,0.92)' : 'rgba(0,0,0,0.45)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '15px', backdropFilter: 'blur(4px)', zIndex: 11 }}>
+                  <div key={p.id} className={`product-card ${isOutOfStock ? 'disabled' : ''}`} onClick={() => { if (isOutOfStock) return; addToCart(p, false, purchaseQuantity); setPurchaseQuantity(1); showToast(`✓ ${p.name} added to cart`, 'success'); }} style={{ height: '100%', opacity: isOutOfStock ? 0.6 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '1rem', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'all 0.2s ease', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id, e); }} style={{ background: favorites.includes(p.id) ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s' }}>
                         {favorites.includes(p.id) ? '⭐' : '☆'}
                       </button>
-                      {!isOutOfStock && <div className="add-btn" style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'var(--accent)', color: 'white', border: 'none' }}><Plus size={20} /></div>}
+                      {!isUnlimited && (
+                        <div style={{ background: isOutOfStock ? 'rgba(239,68,68,0.1)' : isLowStock ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)', color: isOutOfStock ? '#ef4444' : isLowStock ? '#f59e0b' : '#10b981', padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, border: `1px solid ${isOutOfStock ? 'rgba(239,68,68,0.2)' : isLowStock ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}` }}>
+                          {isOutOfStock ? 'OUT OF STOCK' : `${p.stock} ${p.unit} LEFT`}
+                        </div>
+                      )}
                     </div>
-                    <div className="product-info" style={{ marginTop: '0.5rem' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{p.name}</h3>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.category} • {p.unit}</p>
+                    <div className="product-info" style={{ marginTop: '0.25rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>{p.name}</h3>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{p.category}</p>
                     </div>
-                    <div className="product-footer" style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="price" style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 700 }}>₱{parseFloat(p.price || 0).toFixed(2)}</span>
+                    <div className="product-footer" style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600 }}>PRICE</div>
+                        <span className="price" style={{ fontSize: '1.4rem', color: 'var(--accent)', fontWeight: 800 }}>₱{parseFloat(p.price || 0).toFixed(2)}</span>
+                      </div>
+                      {!isOutOfStock && (
+                        <div style={{ background: 'var(--accent)', color: 'white', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}>
+                          <Plus size={20} strokeWidth={3} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

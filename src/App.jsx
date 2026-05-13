@@ -2922,15 +2922,16 @@ function App() {
                 </div>
                 <div><label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Unit</label><select required className="search-bar" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', color: 'var(--text-primary)' }} value={newProduct.unit} onChange={e => setNewProduct({ ...newProduct, unit: e.target.value })}><option value="" disabled style={{ color: 'var(--text-muted)', background: 'var(--bg-main)' }}>Select unit</option><option value="ea" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Piece (ea)</option><option value="pack" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Pack</option><option value="box" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Box</option><option value="kg" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Kilogram (kg)</option><option value="g" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Gram (g)</option><option value="liter" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Liter (L)</option><option value="ml" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Milliliter (ml)</option><option value="dozen" style={{ color: 'var(--text-primary)', background: 'var(--bg-main)' }}>Dozen</option></select></div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div><label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>In Stock</label><input type="number" className="search-bar" style={{ width: '100%', background: 'rgba(255,255,255,0.05)' }} value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} /></div>
                 <div><label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Stock Alert Limit</label><input type="number" min="1" className="search-bar" style={{ width: '100%', background: 'rgba(255,255,255,0.05)' }} value={newProduct.minStock} onChange={e => setNewProduct({ ...newProduct, minStock: e.target.value })} /></div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Tax Type</label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.7rem 0.8rem', borderRadius: '0.75rem', cursor: 'pointer', border: '1px solid var(--border)' }}>
-                    <input type="checkbox" checked={newProduct.isVatExempt} onChange={e => setNewProduct({ ...newProduct, isVatExempt: e.target.checked })} />
-                    <span style={{ fontSize: '0.85rem' }}>VAT Exempt (BNPC)</span>
-                  </label>
-                </div>
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Tax Type</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.7rem 0.8rem', borderRadius: '0.75rem', cursor: 'pointer', border: '1px solid var(--border)' }}>
+                  <input type="checkbox" checked={newProduct.isVatExempt} onChange={e => setNewProduct({ ...newProduct, isVatExempt: e.target.checked })} />
+                  <span style={{ fontSize: '0.85rem' }}>VAT Exempt (BNPC)</span>
+                </label>
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button type="button" className="action-btn" style={{ flex: 1 }} onClick={() => setShowAddProduct(false)}>Cancel</button>

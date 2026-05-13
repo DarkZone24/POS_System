@@ -171,7 +171,7 @@ function App() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [variantSelectModal, setVariantSelectModal] = useState({ show: false, product: null, quantity: 1, shouldRedirect: false });
   const [inventorySearch, setInventorySearch] = useState('');
-  const [newProduct, setNewProduct] = useState({ barcode: '', name: '', price: '', costPrice: '', category: '', unit: 'ea', stock: '', minStock: '5', isVatExempt: false, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80', variants: [] });
+  const [newProduct, setNewProduct] = useState({ barcode: '', name: '', price: '', costPrice: '', category: '', unit: 'ea', stock: '', minStock: '5', isVatExempt: false, image: '', variants: [] });
   const [printState, setPrintState] = useState('receipt');
   const [isProcessingLogin, setIsProcessingLogin] = useState(false);
   const [authView, setAuthView] = useState('login');
@@ -1451,7 +1451,7 @@ function App() {
               unit: String(findValue(item, ['unit', 'uom']) || 'ea'),
               isVatExempt: isExempt,
               minStock: parseInt(findValue(item, ['minstock', 'threshold']) || 5),
-              image: findValue(item, ['image', 'picture', 'url']) || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80'
+              image: findValue(item, ['image', 'picture', 'url']) || ''
             };
 
             if (existingIdx >= 0) {
@@ -1518,7 +1518,7 @@ function App() {
     setProducts([product, ...products]);
     showToast(`✅ "${name}" added to inventory.`, 'success');
     setShowAddProduct(false);
-    setNewProduct({ barcode: '', name: '', price: '', costPrice: '', category: '', unit: 'ea', stock: '', minStock: '5', isVatExempt: false, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80', variants: [] });
+    setNewProduct({ barcode: '', name: '', price: '', costPrice: '', category: '', unit: 'ea', stock: '', minStock: '5', isVatExempt: false, image: '', variants: [] });
   };
 
   // ─────────────────────────────────────────────
@@ -1896,7 +1896,19 @@ function App() {
         {products.slice(0, 4).map(p => (
           <div key={`dash-${p.id}`} className="product-card" style={{ height: 'auto', padding: '1rem' }}>
             <div style={{ position: 'relative' }}>
-              <img src={p.image} className="product-image" style={{ height: '140px', objectFit: 'cover' }} alt="" />
+              {p.image ? (
+                <img src={p.image} className="product-image" style={{ height: '140px', objectFit: 'cover' }} alt={p.name} onError={e => { e.target.style.display = 'none'; }} />
+              ) : (
+                <div style={{
+                  height: '140px',
+                  background: 'rgba(255,255,255,0.04)',
+                  borderRadius: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '3rem'
+                }}>🛒</div>
+              )}
               <button className="action-btn" style={{ position: 'absolute', top: '10px', right: '10px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', padding: 0 }} onClick={(e) => { e.stopPropagation(); addToCart(p, true); }}><Plus size={20} /></button>
             </div>
             <div className="product-info" style={{ marginTop: '0.5rem' }}>
@@ -2042,6 +2054,17 @@ function App() {
                 const isLowStock = !isUnlimited && !isOutOfStock && p.stock <= (p.minStock || 5);
                 return (
                   <div key={p.id} className={`product-card ${isOutOfStock ? 'disabled' : ''}`} onClick={() => { if (isOutOfStock) return; addToCart(p, false, purchaseQuantity); setPurchaseQuantity(1); showToast(`✓ ${p.name} added to cart`, 'success'); }} style={{ height: '100%', opacity: isOutOfStock ? 0.6 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '1rem', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', transition: 'all 0.2s ease', position: 'relative' }}>
+                    <div style={{
+                      height: '90px',
+                      background: 'rgba(255,255,255,0.04)',
+                      borderRadius: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '2.5rem'
+                    }}>
+                      🛒
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <button onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id, e); }} style={{ background: favorites.includes(p.id) ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s' }}>
                         {favorites.includes(p.id) ? '⭐' : '☆'}
@@ -2103,7 +2126,21 @@ function App() {
               </div>
             ) : cart.map(item => (
               <div key={item.id} className="cart-item">
-                <img src={item.image} className="cart-item-img" alt="" />
+                {item.image ? (
+                  <img src={item.image} className="cart-item-img" alt={item.name} onError={e => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    flexShrink: 0
+                  }}>🛒</div>
+                )}
                 <div className="cart-item-info">
                   <h4 style={{ fontSize: '0.9rem' }}>{item.name}</h4>
                   <p style={{ color: 'var(--accent)', fontWeight: 600 }}>₱{parseFloat(item.price || 0).toFixed(2)} x {item.quantity}</p>
@@ -3074,7 +3111,7 @@ function App() {
                             try {
                               setIsResetting(true);
                               showToast('🧹 Wiping Cloud Database...', 'info');
-                              
+
                               await Promise.all([
                                 supabase.from('products').delete().neq('name', '___NON_EXISTENT_PROD___'),
                                 supabase.from('transactions').delete().neq('id', '___NON_EXISTENT_TRX___'),
